@@ -1,44 +1,130 @@
-min_expected_trips <- function(lambda, k,n,q){
-	expected_trips(1-2/n,1-1/n, lambda,k,q)
+ptrip_d2 <- function(lambda,k,ell,d,m,n,q){
+	# prob of NOT resolving a single triplet (d,l)
+	psat <- trunc_poi_R(k,k,lambda*d) #saturated
+	pno_edits <- dpois(0, lambda*ell)
+	p0 <- (psat+(1-psat)*(pno_edits)) 	
+    #p0 <- prob_seq_edits_in_grp(0, d,d+ell, lambda, k, q) 
+    # return prob resolving all n-1 branches
+	p00 <- (1-p0^m)
+    nn <- n-1
+    #nn <- choose(n,3)
+    return(p00^nn)
 }
 
-min_shared_edits <- function(lambda, k,n,q){
-	min_edits_on_branch(1-2/n,1-1/n, lambda,k,q)
+eps <- function(lambda, k, ell, d, m, n, q){
+    p00 <- prob_tripR(lambda,k,ell,d,m,n,q)
+	psat <- trunc_poi_R(k,k,lambda*d) #saturated
+	pno_edits <- dpois(0, lambda*ell)
+	p0 <- (psat+(1-psat)*(pno_edits))^m 	
+    p000 <- p00 - p0
+    return(p000)
 }
 
-# Note: doesn't work do not use
-min_variance_trips <- function(lambda, k,n,q,E0){
-	variance_trips(1-2/n,1-1/n, lambda,k,q,E0)
+
+ptrip_d <- function(lambda, k, ell, d, m, n, q){
+    p00 <- 1-prob_tripR(lambda,k,ell,d,m,n,q)
+    #nn <- choose(n,3)
+    nn <- n-1
+    return(p00^(nn))
 }
 
-get_resolvable_trips <- function(k,lambda,n,m,q,eta){
-	#d <- seq(0, 1-2/n, by=1/n)
-	d <- 1-2/n
-	p0 <- (p_edits_on_branch(0, lambda,k, 1/n, 1-2/n))^m
 
-	#p00 <- mapply(p_trips_0, x=0, du=d, dv=d+1/n, lambda=lambda, k=k, q=q)
-	#p0 <- dbinom(0, m, 1-p00) #prob 0 barcodes out of m have more than 0 edits 
-	#dmax <- d[max(which(p0 >= eta))]
-	#if (all((p0 >= eta) == FALSE)) {return(dmax=0)}
-	#ntrip <- choose(2^(n*(d+2/n)),3)	
-	#trips
-	#tt <- ntrip*p0
-	return(log(max(p0)))
+
+prob_tripR <- function(lambda,k,ell,d,m,n,q){
+    # pre compute pin and pout
+    f_in <- sapply(0:k, prob_seq_edits_in_grp, d, d+ell, lambda, k, q)
+    f_out <- sapply(0:k, prob_on_branch_homo, d,lambda,k,q)
+    p0 <- 0
+    psum_in <- sapply(0:(m*k), prob_allcomb, f_in, lambda, k, ell, d, m, n, q)
+    psum_out <- sapply(0:(m*k), prob_allcomb, f_out, lambda, k, ell, d, m, n, q)
+    psum_out_greater_than <- sapply(0:(m*k), function(i) sum(psum_out[(i+1):(m*k+1)]))
+    # put together
+    eps <- sum(psum_in*psum_out_greater_than)
+    return(p0 + eps)
 }
 
-min_edits_on_branch <- function(du, dv, lambda, k, q){
-	ell <- dv-du
-	x <- seq(0, k, by=1)
-	res <- sum(x*sapply(x, p_edits_on_branch, lambda, k, ell, du))
-	return(res) 
+prob_allcomb <- function(x,f,lambda,k,ell,d,m,n,q){
+   
+   # prob that sum over m barcodes = x (>0)
+    # get all combinations of (m-1) bars  
+    table <- expand.grid(rep(list(0:k), m-1)) # all combinations
+    row_sums <- rowSums(table)
+    table <- table[row_sums <= x & row_sums >= x-k,] 
+    #row_sums <- rowSums(table)
+    ## get prod f...f(m-1)
+    
+    prod_f <- apply(table, 1, function(r) prod(f[r+1])) 
+    f_a <- apply(table,1, function(r) f[x-sum(r)+1]) 
+
+    return(sum(prod_f*f_a))
 }
 
-p_edits_on_branch <- function(x,lambda, k, ell, d){
-	k_vec <- seq(0,k, by = 1)
-	p_new <- mapply(trunc_poi_R, x, k-k_vec, lambda*ell)
-	p_hist <- mapply(trunc_poi_R, k_vec, k, lambda*d)
-	return(sum(p_new*p_hist)) 
+
+opt_p0_fix_d <- function(k,ell,eps,d){
+    #d <- 1.0-2*ell #max val di
+    d2 <- d*ell
+	if (d*ell > 1-2*ell){	
+    return(data.frame(m=NA, lambda=NA, p0 = NA))
+	}
+	else {
+	m <- 1
+    res <- optimize(ptrip_d, c(1, 1/ell), tol=0.00001, k=k, ell=ell, d=d2, m=m)
+    # find min m s.t. ptrip < eps
+    lambda <- res$minimum
+    p01 <- res$objective
+    m <- ceiling(eps/p01)
+    #check
+    p0 <- ptrip_d(lambda, k=k,ell=ell,d=d2, m=m)
+    return(data.frame(m=m, lambda=lambda, p0 = p0))
+}}
+
+
+## fix m, find largest possible d (if it exists)
+## NB: rates <= 1000
+opt_p0_fix_m <- function(k,ell,eps,m){
+    d_max <- 1-2*ell
+	f <- function(dneg, k,ell,eps,m){
+		res <- optimize(ptrip_d, c(1, 100), tol=0.00001, k=k,ell=ell, d=-1*dneg, m=m)
+		return(res$objective-eps)
+	}    
+	## check end points
+	p0_end <- f(-d_max, k, ell, eps, m)
+	p0_start <- f(0, k, ell, eps, m)
+	if (p0_end <= 0){
+		return(d=d_max)
+	} else if (p0_start > 0) {
+		return(d=0)
+	} else {
+	## find root closest to tips (d_max)
+	root <- -1*uniroot(f, c(-d_max, 0), k=k, ell=ell, eps=eps, m=m)$root
+	return(root) 
+	}
 }
+## fix m, find largest possible d (if it exists)
+## fixed rate, m
+est_max_d <- function(k,ell,lambda, m, eps){
+    d_max <- 1-2*ell
+	f <- function(dneg, k,ell,eps,m){
+	d <- -dneg
+	res <- ptrip_d(lambda, k, ell, d, m)	
+	return(res-eps)
+	} 
+	## check end points
+	p0_end <- f(-d_max, k, ell, eps, m)
+	p0_start <- f(0, k, ell, eps, m)
+	if (p0_end <= 0){
+		return(d=d_max)
+	} else if (p0_start > 0) {
+		return(d=0)
+	} else {
+	## find root closest to tips (d_max)
+	root <- -1*uniroot(f, c(-d_max, 0), k=k, ell=ell, eps=eps, m=m)$root
+	return(root)
+	 
+	}
+}
+
+
 
 
 trunc_poi_R <- function(n, max_n, rate){
@@ -62,7 +148,7 @@ trunc_poi_R <- function(n, max_n, rate){
 # chars: list of chars
 simulate_barcode <- function(rate, chars, sampling,tree,root){
 	# first, mutate along root edge	
-	new_root <- colouring(root, tree$root.edge/tree$age, rate, sampling, chars)	
+	new_root <- colouring(root, tree$root.edge, rate, sampling, chars)	
 	mut_tree <- rTraitMult(tree, 
         	colouring, 
         	root.value=new_root, 
@@ -137,20 +223,6 @@ get_RF_score <- function(i,tree,true_dists,k,lambda,m,chars){
 	return(data.frame(k=k,i=i, m=m, triplets=trips, sim_dist=dist))
 }
 
-# returns ultrametric tree
-# alpha, beta: shape/scale of Weibull branching times
-# n: number generations (2^n tips)
-generate_tree <- function(alpha, beta, n){
-    dev_trees <- sim.taxa(numbsim=1, n=2^n, waitsp=paste0("rweibull(",beta,",",alpha,")"), waitext="rexp(0)")
-    tree <- dev_trees[[1]]
-    # make tree ultrametric   
-	tree <- makeNodeLabel(dev_trees[[1]])
-	dd <-max(node.depth.edgelength(tree))
-	tree$edge.length <- tree$edge.length/dd 
-	# and scale root edge
-	tree$root.edge <- tree$root.edge/dd
-	return(tree)
-}
 
 generate_twostage_tree <- function(alpha, beta, n1, n, ratio){
 	
@@ -183,28 +255,57 @@ generate_twostage_tree <- function(alpha, beta, n1, n, ratio){
 
 
 # Simulate process and return df with different scores
-simulate_and_score <- function(nsim, k, lambda, m,n,j, tree, true_dists){
+simulate_and_score <- function(nsim, k, lambda, m,ell,j, tree, true_dists){
 
 	chars <- all_chars[1:j]
 	df <- 1:nsim %>% map_dfr(get_RF_score, tree, true_dists, k, lambda, m, chars)
 	df$j <- j
-	df$n <- n
-	return(df)
+	df$ell <- ell
+	df$lambda1 <- unique(lambda)[1]
+    df$lambda2 <- unique(lambda)[2]
+    df$n <- Ntip(tree)
+    return(df)
 }
 
+get_min_branch <- function(tree){
+	#tree2 <- drop.tip(tree, tree$tip.label, trim.internal=FALSE)
+	ee <- min(tree$edge.length[tree$edge[,2] > Ntip(tree)])
+	return(min(ee, tree$root.edge))
+}
+
+generate_test_tree <- function(alpha, beta, n){
+    dev_trees <- sim.taxa(numbsim=1, n=2^n, waitsp=paste0("rweibull(",beta,",",alpha,")"), waitext="rexp(0)")
+    tree <- dev_trees[[1]]
+    # make tree ultrametric   
+    tree <- makeNodeLabel(dev_trees[[1]])
+    dd <-max(node.depth.edgelength(tree))+tree$root.edge
+    tree$edge.length <- tree$edge.length/dd 
+    # and scale root edge
+    tree$root.edge <- tree$root.edge/dd     
+    return(tree)
+}
+generate_tree <- function(alpha, beta, n, ell){
+        tree <- generate_test_tree(alpha,beta,n)
+        ell2 <- get_min_branch(tree)
+        it <- 1
+        while (ell2 < ell && it < 10){
+                tree <- generate_test_tree(alpha, beta, n)
+                ell2 <- get_min_branch(tree)
+                it <- it +1
+        }
+        return(tree)
+}
 
 
 read_results <- function(file,dir){
 	df <- readRDS(paste0(dir, "/", file))
 	name <- strsplit(file, split="_")
 	model <- name[[1]][1]
-	n <- name[[1]][2]
-	m <- name[[1]][3]
-	j <- name[[1]][4]
-	k <- name[[1]][5]
+	m <- name[[1]][2]
+	j <- name[[1]][3]
+	k <- name[[1]][4]
 	k <- strsplit(k, split="\\.")[[1]][1]
 	df$model <- model
-	df$n <- as.numeric(n)
 	df$m <- as.numeric(m)
 	df$j <- as.numeric(j)
 	df$k <- as.numeric(k)

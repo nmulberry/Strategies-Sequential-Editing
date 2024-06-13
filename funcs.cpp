@@ -84,6 +84,28 @@ double proportion_triplets(NumericMatrix D_true, NumericMatrix D) {
 }
 
 
+// [[Rcpp::export]]
+NumericVector triplet_score(NumericMatrix D_true, NumericMatrix D) {
+  int n = D_true.nrow();
+  int true_count = 0;
+  double depth = 0.0;
+  for (int i1 = 0; i1 < n - 2; ++i1) {
+    for (int i2 = i1 + 1; i2 < n - 1; ++i2) {
+      for (int i3 = i2 + 1; i3 < n; ++i3) {
+        // Find outgroup out of i1,i2,i3 based on D_true
+        int outgrp = find_outgrp(i1,i2,i3,D_true);
+		int outgrp_test = find_outgrp(i1,i2,i3,D);
+		// check
+		if (outgrp_test == -1 | outgrp != outgrp_test) {
+		  true_count++; // triplet not resolved
+          double d = std::max(D_true(i1,i3), std::max(D_true(i1,i2), D_true(i2,i3)));
+          depth = std::max(depth, d); 
+        }
+      }
+    }
+  }  
+  return NumericVector::create(double(true_count), depth); 
+}
 
 //[[Rcpp::export]]
 // Remove nonsequential identical edits
@@ -172,7 +194,7 @@ double prob_on_branch(int x, int k, double lambda, double ell, double d){
    return p;
 }
 
-// Probability x homo edits on branch of depth d (length 1-d)
+// Probability x shared independent edits, depth d (length 1-d)
 //[[Rcpp::export]]
 double prob_on_branch_homo(int x, double d, double lambda, int k, double q){
    double p = 0.0;
@@ -182,117 +204,83 @@ double prob_on_branch_homo(int x, double d, double lambda, int k, double q){
    return p;
 }
 
-//--------------------------//
-// --- DIFFERENCE-TRIPLETS--//
-//--------------------------//
-//[[Rcpp::export]] 
-// Prob x shared edits ingrp 
-// given k sites left
-double prob_x_in(int x, double du, double dv, double lambda, int k,
-	double q){
-	double p_in = 0.0;
-	double p_x1 = 0.0;
-	double p_x2 = 0.0;
-	//x=x1+x2
-	for (int x1 = 0; x1 <= x; ++x1){
-		int x2 = x-x1;
-		// edits from du to dv
-		p_x1 = trunc_poi(x1, k, lambda*(dv-du));	
-		// prob homoplasy in group
-   		p_x2 = corr_prob_homo(x2,lambda, k-x1,dv,q);
-		p_in += p_x1*p_x2;	
-    }
-	return p_in;
-}
-
 
 // du: depth of LCA(a,b,c)
 // dv: depth of LCA of (a,b)
 //[[Rcpp::export]]
 double prob_seq_edits_in_grp(int x, double du, double dv, double lambda,int k, double q){
-	double p_x = 0.0;
-	double p_k1 = 0.0;
-	double p_x2 = 0.0;
-	double p_x1 = 0.0;
-	for (int k1 = 0; k1 <= k; ++k1){	
-		for (int x1 = 0; x1 <= x; ++x1){
-			int x2 = x-x1;
-			// prob x1 edits
-			p_x1 = trunc_poi(x1, k-k1, lambda*(dv-du));	
-		    // p k1 edits
-			p_k1 = trunc_poi(k1, k, lambda*du);
-			// prob homoplasy
-        	p_x2 = corr_prob_homo(x2,lambda, k-x1-k1,dv,q);
-        	p_x += p_x1*p_x2*p_k1;
-		}
-	}	
-	return p_x;
+	if (x < 0 || x > k) { return 0.0;}
+    else {
+        double p_x = 0.0;
+	    double p_k1 = 0.0;
+	    double p_x2 = 0.0;
+	    double p_x1 = 0.0;
+	    for (int k1 = 0; k1 <= k; ++k1){	
+		    for (int x1 = 0; x1 <= x; ++x1){
+			    int x2 = x-x1;
+			    // prob x1 edits
+			    p_x1 = trunc_poi(x1, k-k1, lambda*(dv-du));	
+		        // p k1 edits
+			    p_k1 = trunc_poi(k1, k, lambda*du);
+			    // prob homoplasy
+        	    p_x2 = corr_prob_homo(x2,lambda, k-x1-k1,dv,q);
+        	    p_x += p_x1*p_x2*p_k1;
+		    }
+	    }	
+	    return p_x;
+    }
 }
 
+//--------------------------//
+// --- DIFFERENCE-TRIPLETS--//
+//--------------------------//
 
-//[[Rcpp::export]]
-// d: depth, lambda: rate, k: max # sites
-// q: collision prob
-double expected_trips(double du, double dv, double lambda, int k,double q){ 
-    double expect_in = 0.0;
-    double expect_out = 0.0;
+
+double prob_sum(int index, int m, double sum, int a, int k, NumericVector ff, double prod, double lambda, double q, double du, double dv){
+    if (index == m){
+        if (sum > a | sum < a-k) {
+            return 0.0;
+        } else {
+            std::cout << ff[a-sum]*prod << std::endl;
+            return ff[a-sum]*prod;
+        }
+    }  
+    // recursion
+    double p = 0.0;
+    sum = 0.0;
     for (int x = 0; x <= k; ++x){
-        expect_in += x * prob_seq_edits_in_grp(x,du,dv,lambda,k,q);
-        expect_out += x * prob_on_branch_homo(x,du,lambda,k,q);
+        double px = ff[x];
+        p += prob_sum(index+1, m, sum+x,a, k, ff, prod*px, lambda, q, du,dv);
     }
-	return expect_in - expect_out;	
+    return p;
 }
 
 
 
-///*** DOES NOT WORK ***///
-
 
 //[[Rcpp::export]]
-// prob difference given k sites left
-// d: depth, lambda: rate, k: max # sites
-// q: collision prob
-// x in [-k,k]
-double p_trip_0(int x, double du, double dv, double lambda, int k, double q){ 
-	double p_diff = 0.0;
-   	for (int y = 0; y <= k; ++y){
-		int y2 = y+x;
-		if (y2 >= 0 && y2 <= k){
-			// prob y2 shared edits in-grp
-			double p_in = prob_x_in(y2,du,dv,lambda,k,q);
-			// prob y shared edits out-grp
-       		double p_out = corr_prob_homo(y,lambda,k,du,q);
-			p_diff += p_in*p_out;	
-		}
-	} 
-	return p_diff;	
-}
-
-//[[Rcpp::export]]
-// Prob distribution of difference ingrp-outgrp
-double p_trip00(int x, double du, double dv, double lambda,
-	int k, double q){
-	double p = 0.0;
-	double p_k1 = 0.0;
-	// process from root to du
-	for (int k1 = 0; k1 <= k; ++k1){
-		p_k1 = trunc_poi(k1, k, lambda*du);
-		// they will share k1 edits
-		p += p_trip_0(x, du, dv, lambda, k-k1,q)*p_k1;
-	}	
-	return p;
-}
-//[[Rcpp::export]]
-// d: depth, lambda: rate, k: max # sites
-// q: collision prob
-// NOTE: same as other one, just slower
-double expected_trips00(double du, double dv, double lambda, int k,
-	double q){ 
-    double expect_diff = 0.0;
-    for (int x = -k; x <= k; ++x){
-        expect_diff += x * p_trip00(x,du,dv,lambda,k,q); 
+// total Pr
+double prob_trip(int m, int k, int lambda, int q, double du, double ell){
+    double dv = du+ell;
+    NumericVector f_in (k);
+    NumericVector f_out (k);
+    // pre compute pdfs
+    double p=pow(prob_seq_edits_in_grp(0,du,dv, lambda, k, q),m);
+    for (int x = 0; x <= k; ++x){
+        f_in[x] = prob_seq_edits_in_grp(x,du,dv,lambda,k,q);
     }
-	return expect_diff;	
+    
+    for (int x = 0; x <= k; ++x){
+        f_out[x] = prob_on_branch_homo(x,du,lambda,k,q);
+    }
+    // RUN
+    
+    for (int a = 1.0; a <= m*k; ++a){
+        p += prob_sum(1,m,0.0, a, k, f_in, 1.0, lambda,q,du,dv)*prob_sum(1,m,0.0,a,k,f_out,1.0,lambda,q,du,dv); 
+    }
+    //return 1.0-pow(prob_on_branch(0.0,k,lambda,ell,du),m);
+    return 1.0-p;
 }
+
 
 
