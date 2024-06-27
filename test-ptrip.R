@@ -1,9 +1,14 @@
 source("setup.R")
+
+
+
+
+
 nsim <- 500
 chars <- all_chars
 k <- c(5,7)
 lambda <- seq(1,30, by=1)
-m <- c(3,5)
+m <- c(10,30)
 i <- 1:nsim
 j <- c(2,4,16)
 d <- 0.8
@@ -49,7 +54,7 @@ mutate(p01 = pmap_dbl(., ~ ptrip_d2(..1,..4,..6,..5,..3,2,..8)),
 
 res22 <- res22 %>%
     pivot_longer(cols=starts_with("p"))%>%
-    mutate(name=case_when(name=="ptrip"~"Simulated", name=="p01"~"Approx", name=="p02"~"Full"))
+    mutate(name=case_when(name=="ptrip"~"Simulated", name=="p01"~"Approx", name=="p02"~"P0"))
     
 
 ggplot(filter(res22), aes(lambda, y=value, group=name, col=name, linetype=name))+

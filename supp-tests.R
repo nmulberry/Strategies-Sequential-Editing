@@ -74,7 +74,7 @@ res3$m <- factor(res3$m)
 
 
 ## BARS
-j_star <- 16
+j_star <- 4
 res2 <- filter(res, j==j_star)
 
 res_upgma <- res2 %>%

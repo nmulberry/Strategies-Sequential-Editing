@@ -235,52 +235,45 @@ double prob_seq_edits_in_grp(int x, double du, double dv, double lambda,int k, d
 // --- DIFFERENCE-TRIPLETS--//
 //--------------------------//
 
-
-double prob_sum(int index, int m, double sum, int a, int k, NumericVector ff, double prod, double lambda, double q, double du, double dv){
-    if (index == m){
-        if (sum > a | sum < a-k) {
-            return 0.0;
-        } else {
-            std::cout << ff[a-sum]*prod << std::endl;
-            return ff[a-sum]*prod;
-        }
-    }  
-    // recursion
-    double p = 0.0;
-    sum = 0.0;
-    for (int x = 0; x <= k; ++x){
-        double px = ff[x];
-        p += prob_sum(index+1, m, sum+x,a, k, ff, prod*px, lambda, q, du,dv);
+// Expectation
+//[[Rcpp::export]]
+double expected_in_grp(double du, double dv, double lambda, int k, double q){
+    double E = 0.0;
+    for (int x =0; x <=k; ++x){
+        E += prob_seq_edits_in_grp(x,du,dv,lambda,k,q)*x;
     }
-    return p;
+    return E;
 }
-
-
-
 
 //[[Rcpp::export]]
-// total Pr
-double prob_trip(int m, int k, int lambda, int q, double du, double ell){
-    double dv = du+ell;
-    NumericVector f_in (k);
-    NumericVector f_out (k);
-    // pre compute pdfs
-    double p=pow(prob_seq_edits_in_grp(0,du,dv, lambda, k, q),m);
-    for (int x = 0; x <= k; ++x){
-        f_in[x] = prob_seq_edits_in_grp(x,du,dv,lambda,k,q);
+double expected_out_grp(double du, double lambda, int k, double q){
+
+    double E = 0.0;
+    for (int x =0; x <= k; ++x){
+        E += prob_on_branch_homo(x,du,lambda,k,q)*x;
     }
-    
-    for (int x = 0; x <= k; ++x){
-        f_out[x] = prob_on_branch_homo(x,du,lambda,k,q);
+    return E;
+}
+// Variance
+//[[Rcpp::export]]
+double var_in_grp(double du, double dv, double lambda, int k, double q){
+    double S = 0.0;
+    for (int x =0; x <= k; ++x){
+        S += prob_seq_edits_in_grp(x,du,dv,lambda,k,q)*pow(x,2);
     }
-    // RUN
-    
-    for (int a = 1.0; a <= m*k; ++a){
-        p += prob_sum(1,m,0.0, a, k, f_in, 1.0, lambda,q,du,dv)*prob_sum(1,m,0.0,a,k,f_out,1.0,lambda,q,du,dv); 
-    }
-    //return 1.0-pow(prob_on_branch(0.0,k,lambda,ell,du),m);
-    return 1.0-p;
+    double E = expected_in_grp(du,dv,lambda,k,q);
+    return S-pow(E,2);
 }
 
+//[[Rcpp::export]]
+double var_out_grp(double du, double lambda, int k, double q){
+
+    double S = 0.0;
+    for (int x =0; x <= k; ++x){
+        S += prob_on_branch_homo(x,du,lambda,k,q)*pow(x,2);
+    }
+    double E = expected_out_grp(du,lambda,k,q);
+    return S-pow(E,2);
+}
 
 

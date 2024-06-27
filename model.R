@@ -1,49 +1,69 @@
 ptrip_d2 <- function(lambda,k,ell,d,m,n,q){
-	# prob of NOT resolving a single triplet (d,l)
-	psat <- trunc_poi_R(k,k,lambda*d) #saturated
-	pno_edits <- dpois(0, lambda*ell)
-	p0 <- (psat+(1-psat)*(pno_edits)) 	
-    #p0 <- prob_seq_edits_in_grp(0, d,d+ell, lambda, k, q) 
-    # return prob resolving all n-1 branches
-	p00 <- (1-p0^m)
+	p00 <- 1-prob_trip_approx(lambda, k, ell, d, m, q)
     nn <- n-1
     #nn <- choose(n,3)
     return(p00^nn)
 }
 
-eps <- function(lambda, k, ell, d, m, n, q){
-    p00 <- prob_tripR(lambda,k,ell,d,m,n,q)
-	psat <- trunc_poi_R(k,k,lambda*d) #saturated
-	pno_edits <- dpois(0, lambda*ell)
-	p0 <- (psat+(1-psat)*(pno_edits))^m 	
-    p000 <- p00 - p0
-    return(p000)
+
+prob_zero <- function(lambda, k, ell, d, m, q){
+    p0 <- prob_seq_edits_in_grp(0,d, d+ell, lambda, k, q)
+    return(p0^m)
 }
 
-
 ptrip_d <- function(lambda, k, ell, d, m, n, q){
-    p00 <- 1-prob_tripR(lambda,k,ell,d,m,n,q)
-    #nn <- choose(n,3)
+    p00 <- 1-prob_zero(lambda,k,ell,d,m,q)
     nn <- n-1
     return(p00^(nn))
 }
 
+prob_trip_approx_d <- function(d, lambda,k,ell,m,q){
+    prob_trip_approx(lambda,k,ell,d,m,q)
+}
+
+prob_trip_approx <- function(lambda, k, ell,d,m,q){
+    mu_in <- m*expected_in_grp(d,d+ell,lambda,k,q)
+    mu_out<- m*expected_out_grp(d,lambda,k,q)
+    var_in <- m*var_in_grp(d,d+ell,lambda,k,q)
+    var_out <- m*var_out_grp(d,lambda,k,q)
+    ## normal approx
+    mu_tot <- mu_in-mu_out
+    var_tot <- var_in+var_out
+    p_approx <- pnorm(1, mu_tot, sqrt(var_tot))
+
+    return(p_approx)
+
+}
 
 
-prob_tripR <- function(lambda,k,ell,d,m,n,q){
+prob_tripR_trunc <- function(lambda,k,ell,d,m,q){
+    # pre compute pin and pout
+    f_in <- sapply(0:k, prob_seq_edits_in_grp, d, d+ell, lambda, k, q)
+    f_out <- sapply(0:k, prob_on_branch_homo, d,lambda,k,q)
+    browser()
+    # p1
+    p <- f_in[0]
+    outsum0 <- f_out[1]^m
+    outsum1 <- m*f_out[2]*f_out[1]^(m-1)
+    outsum2 <- choose(m,2)*f_out[2]*f_out[1]^(m-2)+m*f_out[3]*f_out[1]^(m-1)
+    return(p0)
+}
+prob_tripR_full <- function(lambda,k,ell,d,m,q){
     # pre compute pin and pout
     f_in <- sapply(0:k, prob_seq_edits_in_grp, d, d+ell, lambda, k, q)
     f_out <- sapply(0:k, prob_on_branch_homo, d,lambda,k,q)
     p0 <- 0
-    psum_in <- sapply(0:(m*k), prob_allcomb, f_in, lambda, k, ell, d, m, n, q)
-    psum_out <- sapply(0:(m*k), prob_allcomb, f_out, lambda, k, ell, d, m, n, q)
-    psum_out_greater_than <- sapply(0:(m*k), function(i) sum(psum_out[(i+1):(m*k+1)]))
+    mm <- m*k
+    psum_in <- sapply(0:(mm), prob_allcomb, f_in, lambda, k, ell, d, m, q)
+    psum_out <- sapply(0:(mm), prob_allcomb, f_out, lambda, k, ell, d, m, q)
+    psum_out_greater_than <- sapply(0:(mm), function(i) sum(psum_out[(i+1):(mm+1)]))
     # put together
     eps <- sum(psum_in*psum_out_greater_than)
-    return(p0 + eps)
+    return((p0 + eps))
 }
 
-prob_allcomb <- function(x,f,lambda,k,ell,d,m,n,q){
+
+prob_allcomb <- function(x,f,lambda,k,ell,d,m,q){
    
    # prob that sum over m barcodes = x (>0)
     # get all combinations of (m-1) bars  
