@@ -1,9 +1,72 @@
-ptrip_d2 <- function(lambda,k,ell,d,m,n,q){
-	p00 <- 1-prob_trip_approx(lambda, k, ell, d, m, q)
-    nn <- n-1
-    #nn <- choose(n,3)
-    return(p00^nn)
+pfull_0 <- function(lambda,k,ell,m,n,q){
+    p0 <- ptrip_0(1-2*ell, lambda, k, ell, m,n,q)
+    return((1-p0)^(n-2))
 }
+
+
+pfull_1 <- function(lambda,k,ell,m,n,q){
+    # first max p0 over T
+    res <- optim(1-2*ell,ptrip_1, lambda=lambda,
+        k=k,ell=ell,m=m,n=n,q=q, method="L-BFGS", lower=ell, upper=1-2*ell,
+        control=list(fnscale=-1))
+    pmax <- res$value
+    p0 <- 1-(choose(n,3)*pmax)
+    return(max(0, p0))
+}
+
+pfull_2 <- function(lambda,k,ell,m,n,q){
+    res <- optim(1-2*ell, ptrip_2, lambda=lambda,
+        k=k,ell=ell,m=m,n=n,q=q,method="L-BFGS", lower=ell, upper=1-2*ell,
+        control=list(fnscale=-1))
+    p0 <- res$value
+    return((1-p0)^(n-2))
+}
+
+ptrip_0 <- function(d, lambda,k,ell,m,n,q){
+	p00 <- prob_seq_edits_in_grp(0,d, d+ell,lambda,k,0)^m
+    return(p00)
+}
+
+ptrip_1 <- function(d,lambda,k,ell,m,n,q){
+    p0 <- prob_trip_approx(lambda,k,ell,d,m,q)
+    return(p0)
+}
+
+ptrip_2 <- function(d,lambda,k,ell,m,n,q){
+    mu_in <- m*expected_in_grp(d,d+ell, lambda, k, 0)
+    mu_out <- m*expected_out_grp(d,lambda,k,q)
+    var_in <- m*var_in_grp(d,d+ell,lambda,k,0)
+    var_out <- m*var_out_grp(d,lambda,k,q)
+    p_x <- function(x, mu_in, mu_out, var_in, var_out){
+        phi1 <- pnorm(x+0.5, mu_in, sqrt(var_in))
+        phi2 <- pnorm(x-0.5, mu_in, sqrt(var_in))
+        phix <- phi1-phi2    
+        phi3 <- pnorm(x, mu_out, sqrt(var_out)) 
+
+        return((phix)*phi3^(n-2))
+     }
+    
+    p <- sapply(1:(m*k), p_x, mu_in, mu_out, var_in, var_out)
+    return(1-sum(p))
+}
+
+ptrip_2_0 <- function(d,lambda,k,ell,m,n,q){
+    mu_out <- m*expected_out_grp(d,lambda,k,q)
+    var_out <- m*var_out_grp(d,lambda,k,q)
+    
+    f_in <- sapply(0:k, prob_seq_edits_in_grp, d, d+ell, lambda, k, 0)
+    
+    p_x <- function(x, mu_out, var_out, f_in, k, m){
+        phix <- prob_allcomb(x, f_in, k,m)
+        phi3 <- pnorm(x, mu_out, sqrt(var_out)) 
+
+        return((phix)*phi3^(n-2))
+     }
+    
+    p <- sapply(1:(m*k), p_x,mu_out,var_out, f_in, k, m)
+    return(1-sum(p))
+}
+
 
 
 prob_zero <- function(lambda, k, ell, d, m, q){
@@ -11,15 +74,20 @@ prob_zero <- function(lambda, k, ell, d, m, q){
     return(p0^m)
 }
 
-ptrip_d <- function(lambda, k, ell, d, m, n, q){
-    p00 <- 1-prob_zero(lambda,k,ell,d,m,q)
+ptrip_d <- function(lambda, k, ell, d, m, n){
+    p00 <- 1-prob_zero(lambda,k,ell,d,m,0)
     nn <- n-1
     return(p00^(nn))
 }
 
 prob_trip_approx_d <- function(d, lambda,k,ell,m,q){
-    prob_trip_approx(lambda,k,ell,d,m,q)
+
+    p <- prob_trip_approx(lambda,k,ell,d,m,q)
+   # p <- ptrip_d2(lambda,k,ell,d,m,q)
+    return(p)
 }
+
+
 
 prob_trip_approx <- function(lambda, k, ell,d,m,q){
     mu_in <- m*expected_in_grp(d,d+ell,lambda,k,q)
@@ -30,42 +98,34 @@ prob_trip_approx <- function(lambda, k, ell,d,m,q){
     mu_tot <- mu_in-mu_out
     var_tot <- var_in+var_out
     p_approx <- pnorm(1, mu_tot, sqrt(var_tot))
-
     return(p_approx)
 
 }
 
 
-prob_tripR_trunc <- function(lambda,k,ell,d,m,q){
-    # pre compute pin and pout
-    f_in <- sapply(0:k, prob_seq_edits_in_grp, d, d+ell, lambda, k, q)
-    f_out <- sapply(0:k, prob_on_branch_homo, d,lambda,k,q)
-    browser()
-    # p1
-    p <- f_in[0]
-    outsum0 <- f_out[1]^m
-    outsum1 <- m*f_out[2]*f_out[1]^(m-1)
-    outsum2 <- choose(m,2)*f_out[2]*f_out[1]^(m-2)+m*f_out[3]*f_out[1]^(m-1)
-    return(p0)
-}
-prob_tripR_full <- function(lambda,k,ell,d,m,q){
+prob_tripR_full <- function(lambda,k,ell,d,m,n,q){
     # pre compute pin and pout
     f_in <- sapply(0:k, prob_seq_edits_in_grp, d, d+ell, lambda, k, q)
     f_out <- sapply(0:k, prob_on_branch_homo, d,lambda,k,q)
     p0 <- 0
     mm <- m*k
-    psum_in <- sapply(0:(mm), prob_allcomb, f_in, lambda, k, ell, d, m, q)
-    psum_out <- sapply(0:(mm), prob_allcomb, f_out, lambda, k, ell, d, m, q)
-    psum_out_greater_than <- sapply(0:(mm), function(i) sum(psum_out[(i+1):(mm+1)]))
+    #in >= 1
+    psum_in <- sapply(1:(mm), prob_allcomb, f_in,  k, m)
+    psum_out <- sapply(0:(mm), prob_allcomb, f_out, k, m)
+    #psum_out_greater_than <- sapply(0:(mm), function(i) sum(psum_out[(i+1):(mm+1)]))
+    psum_out_strict_less <- sapply(1:mm, function(i) sum(psum_out[1:i]))
+
     # put together
-    eps <- sum(psum_in*psum_out_greater_than)
-    return((p0 + eps))
+    
+    p <- sum(psum_in*(psum_out_strict_less)^(n/2))
+    
+    return(p^(n-2))
 }
 
 
-prob_allcomb <- function(x,f,lambda,k,ell,d,m,q){
+
+prob_allcomb <- function(x,f,k,m){
    
-   # prob that sum over m barcodes = x (>0)
     # get all combinations of (m-1) bars  
     table <- expand.grid(rep(list(0:k), m-1)) # all combinations
     row_sums <- rowSums(table)
@@ -80,23 +140,18 @@ prob_allcomb <- function(x,f,lambda,k,ell,d,m,q){
 }
 
 
-opt_p0_fix_d <- function(k,ell,eps,d){
-    #d <- 1.0-2*ell #max val di
-    d2 <- d*ell
-	if (d*ell > 1-2*ell){	
-    return(data.frame(m=NA, lambda=NA, p0 = NA))
-	}
-	else {
-	m <- 1
-    res <- optimize(ptrip_d, c(1, 1/ell), tol=0.00001, k=k, ell=ell, d=d2, m=m)
+opt_p0_fix_d <- function(k,ell,eps,n){
+    d2 <- 1-2*ell
+    res <- optimize(prob_zero, c(1,1/ell), tol=0.00001, k=k, ell=ell, d=d2,m=1,q=0)
     # find min m s.t. ptrip < eps
     lambda <- res$minimum
     p01 <- res$objective
-    m <- ceiling(eps/p01)
-    #check
-    p0 <- ptrip_d(lambda, k=k,ell=ell,d=d2, m=m)
-    return(data.frame(m=m, lambda=lambda, p0 = p0))
-}}
+    m <- log(1-eps^(1/(n-1)))/log(p01)
+    ###
+    m <- ceiling(m)
+    p01 <- pfull_0(lambda,k,ell,m,n,0)
+    return(data.frame(m=m, lambda=lambda, p0=p01))
+}
 
 
 ## fix m, find largest possible d (if it exists)
@@ -143,8 +198,6 @@ est_max_d <- function(k,ell,lambda, m, eps){
 	 
 	}
 }
-
-
 
 
 trunc_poi_R <- function(n, max_n, rate){

@@ -1,79 +1,102 @@
 source("setup.R")
 lambda <- seq(1, 30, by=1)
-k <- c(5)
 
-q <- seq(0, 1, by=0.2)
-m <- c(10,50,100)
-
-d <- 0.8
-ell <- 0.1
-
-df <- crossing(lambda=lambda, k=k, ell=ell, d=d, m=m,q=q)
-
-res <- df
-res$p_approx <- df %>% pmap_dbl(prob_trip_approx)
-res$p0 <- df %>% pmap_dbl(prob_zero)
-res <- res %>% pivot_longer(cols=c("p_approx", "p0"))
-
-test <- ggplot(res, 
-    aes(x=lambda, y=value, col=name))+
-    geom_line()+
-    facet_grid(k+m~q, labeller=label_both)+
-    labs(x=expression(lambda), y="", col="")+
-    scale_colour_brewer(palette="Set1")
-ggsave("test-approx1.pdf", height=7,width=10)
-## test over different values of k?
-
-## also test against full distribution (small m)
-if (FALSE){
-q <- c(0.25,0.5,0.75)
-m <- c(5,7)
-k <- 5
-
-df <- crossing(lambda=lambda, k=k, ell=ell,d=d, m=m, q=q)
-res <- df
-res$p_approx <- df %>% pmap_dbl(prob_trip_approx)
-res$p_full <- df %>% pmap_dbl(prob_tripR_full)
-res <- res %>% pivot_longer(cols=c("p_approx", "p_full"))
-test2 <- ggplot(res, 
-    aes(x=lambda, y=value, col=name))+
-    geom_line()+
-    facet_grid(k+m~q, labeller=label_both)+
-    labs(x=expression(lambda), y="", col="")+
-    scale_colour_brewer(palette="Set1")
-ggsave("test-approx2.pdf", height=7,width=10)
-}
 
 ## test when q=0:
-k <- c(5,7,9,12)
-m <- c(1,10,100,1000)
-q <- 0
-d <- 0.8
-ell <- 0.1
+k <- c(12)
+m <- c(10,100,1000)
+q <- 0.0
+ell <- c(0.1,0.005)
+n <- c(10,100,1000,5000) 
 
-df <- crossing(lambda=lambda, k=k, ell=ell, d=d, m=m,q=q)
+df <- crossing(lambda=lambda, k=k, ell=ell, m=m,n=n,q=q)
+
 
 res <- df
-res$p_approx <- df %>% pmap_dbl(prob_trip_approx)
-res$p0 <- df %>% pmap_dbl(prob_zero)
-res <- res %>% 
-    group_by(k,m,q,d,ell) %>%
-    mutate(err = norm(p_approx-p0, type="2"))
+res$B1 <- df %>% pmap_dbl(pfull_1)
+res$B0 <- df %>% pmap_dbl(pfull_0)
 
 
 
-res2 <- res %>% pivot_longer(cols=c("p_approx", "p0"))
+res2 <- res %>% pivot_longer(cols=c("B1", "B0"))
 
 res2$k <- factor(res2$k)
-test3 <- ggplot(res2, 
-    aes(x=lambda, y=value, col=k, linetype=name))+
-    geom_line(linewidth=1.1)+
-    facet_grid(~m, labeller=label_both)+
-    labs(x=expression(lambda), y="", col="k", linetype="")+
-    scale_colour_brewer(palette="Set1")
-ggsave("test-approx-q0.pdf")
+
+test3 <- ggplot(filter(res2), 
+    aes(x=lambda, y=value, col=name, linetype=name))+
+    geom_line(linewidth=1.1)+ facet_grid(ell+m~n+k, labeller=label_both)+
+    labs(x=expression(lambda), y="", col="", linetype="")+
+    scale_linetype_manual(values=c("B0"="solid", "B1"="dashed"))+
+    scale_colour_manual(values=c("B1"="red", "B0"="lightblue"))+
+	theme(legend.position="bottom")
+ggsave("test-approx-q0.pdf", width=10, height=11)
 
 
-test2 <- ggplot(res, aes(x=m, y=err))+
-    geom_point()+geom_line()+
-    facet_wrap(~k)
+########################
+# TEST 2: TRIPLET PROB
+########################
+nsim <- 100
+chars <- all_chars
+k <- c(5,7)
+lambda <- seq(1,30, by=1)
+m <- c(10,30)
+i <- 1:nsim
+j <- c(4,16,64)
+d <- 0.8
+ell <- c(0.1, 0.01)
+pars0 <- crossing(i=i, lambda=lambda,j=j, m=m,k=k,d=d, ell=ell)
+##===========================#
+## test diff
+run_colour_model_diff <- function(i,lambda,j,m,k,d,ell){
+    chars <- all_chars[1:j]
+    root <- paste0(rep("0", k), collapse='')
+    sample_p <- rep(1/length(chars), length(chars))
+    s_in <- 0
+    s_outa <- 0
+    s_outb <- 0
+    for (i in 1:m){
+        res0 <- colouring(root, d, lambda, sample_p, chars)
+        resc <- colouring(res0, 1.-d, lambda, sample_p, chars)
+        resv <- colouring(res0, ell, lambda, sample_p, chars)
+        resa <- colouring(resv, 1-d-ell, lambda, sample_p, chars)
+        resb <- colouring(resv, 1-d-ell, lambda, sample_p, chars)
+        # count
+        s_in <- s_in + count_sequential_matches(resa,resb)
+        s_outa <- s_outa + count_sequential_matches(resa,resc)
+        s_outb <- s_outb + count_sequential_matches(resb, resc)
+     }
+
+    return(s_in-s_outa)
+}
+
+res <- pars0
+res$num_edits <- res %>% pmap_dbl(run_colour_model_diff)
+
+res22 <- res %>%
+    group_by(lambda,j,m,k,d,ell)%>%
+    summarize(ptrip=sum(num_edits > 0)/n())%>%
+    ungroup()%>%
+	mutate(ptrip=1-ptrip) #prob not resolve
+
+
+
+res22 <- res22 %>% mutate(q=1/j) %>%
+mutate(p0 = pmap_dbl(., ~ ptrip_0(..5,..1,..4,..6,..3,3,..8)), 
+    p1 = pmap_dbl(., ~ ptrip_1(..5,..1,..4,..6,..3,3,..8)))
+
+res22 <- res22 %>%
+    pivot_longer(cols=starts_with("p"))%>%
+    mutate(name=case_when(name=="ptrip"~"Simulated", name=="p0"~"B0", name=="p1"~"B1",
+	name=="p2"~"p_approx_split"))
+    
+
+ggplot(filter(res22), aes(lambda, y=value, group=name, col=name, linetype=name))+
+    geom_line()+
+    scale_linetype_manual(values=c(Simulated="solid", "B0"="dashed","B1" = "dashed"))+
+	scale_colour_manual(values=c(Simulated="black", "B1"="red", "B0" = "lightblue"))+
+    facet_grid(m+j~k+ell, labeller=label_both)+theme(legend.position="bottom")+
+    labs(y="Prob not resolve triplet",col="", linetype="", x=expression(lambda))
+
+ggsave("onetrip-sim-all.pdf")
+
+

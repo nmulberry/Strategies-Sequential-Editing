@@ -1,7 +1,7 @@
 source("setup.R")
 
 
-
+if (FALSE) {
 
 
 nsim <- 500
@@ -75,7 +75,7 @@ ggplot(filter(res22, ell==0.1, k==5), aes(lambda, y=value, group=name, col=name,
     labs(y="Probability resolve (a,b|c)",col="", linetype="", x=expression(lambda))
 
 ggsave("onetrip-sim-small.pdf")
-
+}
 
 
 #### trees
@@ -84,45 +84,35 @@ test_p_over_trees <- function(n, beta, ell){
     ell<- get_min_branch(tree)
     true_dists <- cophenetic.phylo(tree)
     ## run sims
-    pars <- crossing(nsim=200, k=c(5,7), lambda = seq(1,30, by=1), m=c(3,5),ell=ell, j=c(4,16,64))
+    pars <- crossing(nsim=100, k=c(1,5), lambda = seq(1,30, by=1), m=c(10,50),ell=ell, j=c(4,64))
     res <- pars %>% pmap_dfr(simulate_and_score, tree=tree, true_dists=true_dists)
     res$lambda <- res$lambda1
     res_summ <- res %>%
         group_by(k,m,j,ell,lambda) %>%
         summarize(trip_score = sum(triplets==0)/n(),
             upgma_score = sum(sim_dist==0)/n())
-    res_summ$d <- 1-2*res_summ$ell
     res_summ$n <- 2^n
     res_summ$q <- 1/res_summ$j
-    res_summ$ptrip_full <- res_summ %>% pmap_dbl(., ~ptrip_d(..5,..1,..4,..8,..2,..9,..10))
-    res_summ$ptrip_0 <- res_summ %>% pmap_dbl(., ~ptrip_d2(..5,..1,..4,..8,..2,..9,..10))
+    res_summ$p0 <- res_summ %>% pmap_dbl(., ~pfull_0(..5,..1,..4,..2,..8,..9))
+    res_summ$p1 <- res_summ %>% pmap_dbl(., ~pfull_1(..5,..1,..4,..2,..8,..9))
+    res_summ$p2 <- res_summ %>% pmap_dbl(., ~pfull_2(..5,..1,..4,..2,..8,..9))
     res_summ$beta <- beta
     return(res_summ)
 }
 
 
 
-pars <- crossing(n=c(2,3,4), beta=c(10,100), ell=c(0.01)) 
+pars <- crossing(n=c(4), beta=c(10, 100), ell=c(0.01)) 
 res <- pars %>% pmap_dfr(test_p_over_trees)
 
 
 res$k <- factor(res$k)
-gg <- ggplot(res, aes(x=lambda, col=k, group=k))+
-    geom_line(aes(y=upgma_score))+
-    geom_line(aes(y=ptrip_0), linetype="dashed")+
-    geom_line(aes(y=ptrip_full), linetype="dotted")+
-    facet_grid(n+beta~j+m, labeller=label_both)+
+gg <- ggplot(res, aes(x=lambda))+
+    geom_line(aes(y=upgma_score), linewidth=1.05)+
+    geom_line(aes(y=p0),linewidth=1.05, linetype="dashed", col="red")+
+    geom_line(aes(y=p2), linewidth=1.05, alpha=1, linetype="dashed", col="lightblue")+
+    geom_line(aes(y=p1), linewidth=1.05, alpha=1, linetype="dashed",col="pink")+
+    facet_grid(m+beta~j+k, labeller=label_both)+
     labs(y="Reconstruction Probability", x=expression(lambda))
 
 ggsave("all_test_trees.pdf")
-## smaller fig
-res <- res %>% mutate(model = case_when(beta==10~"asynchronous", TRUE~"synchronous"))
-res$m <- factor(res$m)
-
-gg_a <- ggplot(filter(res, j==16, k==5, n==16), aes(x=lambda))+
-    geom_line(aes(y=upgma_score), linewidth=1.2)+
-    geom_line(aes(y=ptrip_0), linetype="dashed",linewidth=1.2)+
-    geom_line(aes(y=ptrip_full), linetype="dotted",linewidth=1.2)+
-    facet_grid(m~model)+
-    labs(x=expression(lambda), y="Reconstruction probability")
-ggsave("smaller_test_trees.pdf")    
