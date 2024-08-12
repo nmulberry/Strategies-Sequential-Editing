@@ -1,4 +1,9 @@
 *.pdf
+*.RDS
+
+# output files
+analysis/Figures/*
+analysis/output/*
 
 # History files
 .Rhistory
