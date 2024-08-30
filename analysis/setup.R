@@ -8,18 +8,15 @@ library(magrittr)
 library(purrr)
 library(forcats)
 library(ggplot2); 
-theme_set(theme_minimal(base_size = 12)+theme(panel.border = element_rect(colour = "black", fill=NA, size=1))) 
+theme_set(theme_minimal(base_size = 14)+theme(panel.border = element_rect(colour = "black", fill=NA, size=1))) 
 library(Rcpp)
-sourceCpp("funcs.cpp")
-source("model.R")
+sourceCpp("../src/funcs.cpp")
+source("../src/model.R")
 library(phytools)
 library(viridis)
 library(phangorn)
 library(RColorBrewer)
-#fig_dir <- "../report/Figures"
-#save_figs <- TRUE
-#asynchronous <- TRUE
-#load_res <- TRUE
+fig_dir <- "../report/Figures"
 
 all_chars <- c("a","b","c","d","e","f","g","h","i","j",
 	"k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v",

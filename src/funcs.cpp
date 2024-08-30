@@ -244,7 +244,6 @@ double expected_in_grp(double du, double dv, double lambda, int k, double q){
 
 //[[Rcpp::export]]
 double expected_out_grp(double du, double lambda, int k, double q){
-
     double E = 0.0;
     for (int x =0; x <= k; ++x){
         E += prob_on_branch_homo(x,du,lambda,k,q)*x;

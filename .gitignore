@@ -1,6 +1,6 @@
 *.pdf
 *.RDS
-
+*.svg
 # output files
 analysis/Figures/*
 analysis/output/*

@@ -1,4 +1,3 @@
-source("setup.R")
 ##--------------------##
 ## LOAD DATA IF AVAIL
 ##--------------------##
@@ -115,7 +114,7 @@ gg3 <- ggplot() +
   scale_color_manual(values=c("lightblue","red", "black"))+
 	theme(legend.position="bottom")
 
-ggsave("sampled_bars.png", height=6, width=9)
+ggsave("sampled_bars.pdf", height=6, width=9)
 
 
 

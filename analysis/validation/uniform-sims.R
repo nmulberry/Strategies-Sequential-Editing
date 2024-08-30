@@ -1,4 +1,4 @@
-source("setup.R")
+
 ##--------------------##
 ## LOAD DATA IF AVAIL
 ##--------------------##
@@ -33,8 +33,6 @@ if (load_res){
 }
 
 
-
-#res <- filter(res0, m < 70)
 
 res <- res0
 res$lambda <- res$lambda1
@@ -75,7 +73,7 @@ gg_traj <- ggplot(filter(res4,m==10,n==128, k !=13, j != 16),
     labs(x=expression("Editing rate (" * lambda * ")"), y="", col="# sites (k)", fill="# sites (k)")+
     scale_fill_brewer(palette="Dark2")+
     scale_colour_brewer(palette="Dark2")+
-	theme(legend.position="inside", legend.position.inside=c(0.17,0.9))+
+	theme(legend.position="inside", legend.position.inside=c(0.2,0.9))+
 	ggtitle("Simulated RF Distance")
 
 
@@ -123,7 +121,6 @@ gg_test <- ggplot(filter(res2, n==128, m==50), aes(x=lambda, y=value, col=name))
 	labs(x=expression(lambda), y="reconstruction prob", col="Predicted 0.9 Accuracy")+
 	theme(legend.position="top")
 
-ggsave("test-legend.pdf")
 library(cowplot)
 legend2 <- cowplot::get_legend(gg_test)
 
@@ -131,7 +128,7 @@ plot_grid(gg_trips_grid,
 	gg_traj,
 nrow=1,labels=c("a","b"), rel_widths=c(2,1))
 
-ggsave("uniform-results.png",height=7, width=10)
+ggsave("uniform-results.pdf",height=7, width=10)
 
 
 
@@ -192,7 +189,7 @@ gg3 <- ggplot() +
   scale_color_manual(values=c("lightblue","red", "black"))+
 	theme(legend.position="bottom")
 
-ggsave("uniform_bars.png", height=6, width=9)
+ggsave("uniform_bars.pdf", height=6, width=9)
 
 
 

@@ -17,13 +17,6 @@ pfull_1 <- function(lambda,k,ell,m,n,q, dmax){
 }
 
 
-pfull_2 <- function(lambda,k,ell,m,n,q){
-    res <- optim(1-ell, ptrip_2, lambda=lambda,
-        k=k,ell=ell,m=m,n=n,q=q,method="L-BFGS", lower=ell, upper=1-ell,
-        control=list(fnscale=-1))
-    p0 <- res$value
-    return((1-p0)^(n-2))
-}
 
 ptrip_0 <- function(d, lambda,k,ell,m,n,q){
 	p00 <- prob_seq_edits_in_grp(0,d, d+ell,lambda,k,0)^m
