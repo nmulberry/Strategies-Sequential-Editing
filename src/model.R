@@ -54,77 +54,6 @@ p1_max_d <- function(k,ell,lambda, m, n, q,eps){
 }
 
 
-ptrip_2 <- function(d,lambda,k,ell,m,n,q){
-    mu_in <- m*expected_in_grp(d,d+ell, lambda, k, 0)
-    mu_out <- m*expected_out_grp(d,lambda,k,q)
-    var_in <- m*var_in_grp(d,d+ell,lambda,k,0)
-    var_out <- m*var_out_grp(d,lambda,k,q)
-    p_x <- function(x, mu_in, mu_out, var_in, var_out){
-        phi1 <- pnorm(x+0.5, mu_in, sqrt(var_in))
-        phi2 <- pnorm(x-0.5, mu_in, sqrt(var_in))
-        phix <- phi1-phi2    
-        phi3 <- pnorm(x, mu_out, sqrt(var_out)) 
-
-        return((phix)*phi3^(n-2))
-     }
-    
-    p <- sapply(1:(m*k), p_x, mu_in, mu_out, var_in, var_out)
-    return(1-sum(p))
-}
-
-ptrip_2_0 <- function(d,lambda,k,ell,m,n,q){
-    mu_out <- m*expected_out_grp(d,lambda,k,q)
-    var_out <- m*var_out_grp(d,lambda,k,q)
-    
-    f_in <- sapply(0:k, prob_seq_edits_in_grp, d, d+ell, lambda, k, 0)
-    
-    p_x <- function(x, mu_out, var_out, f_in, k, m){
-        phix <- prob_allcomb(x, f_in, k,m)
-        phi3 <- pnorm(x, mu_out, sqrt(var_out)) 
-
-        return((phix)*phi3^(n-2))
-     }
-    
-    p <- sapply(1:(m*k), p_x,mu_out,var_out, f_in, k, m)
-    return(1-sum(p))
-}
-
-
-
-prob_zero <- function(lambda, k, ell, d, m, q){
-    p0 <- prob_seq_edits_in_grp(0,d, d+ell, lambda, k, q)
-    return(p0^m)
-}
-
-ptrip_d <- function(lambda, k, ell, d, m, n){
-    p00 <- 1-prob_zero(lambda,k,ell,d,m,0)
-    nn <- n-1
-    return(p00^(nn))
-}
-
-prob_trip_approx_d <- function(d, lambda,k,ell,m,q){
-
-    p <- prob_trip_approx(lambda,k,ell,d,m,q)
-   # p <- ptrip_d2(lambda,k,ell,d,m,q)
-    return(p)
-}
-
-
-
-prob_trip_approx <- function(lambda, k, ell,d,m,q){
-    mu_in <- m*expected_in_grp(d,d+ell,lambda,k,q)
-    mu_out<- m*expected_out_grp(d,lambda,k,q)
-    var_in <- m*var_in_grp(d,d+ell,lambda,k,q)
-    var_out <- m*var_out_grp(d,lambda,k,q)
-    ## normal approx
-    mu_tot <- mu_in-mu_out
-    var_tot <- var_in+var_out
-    p_approx <- pnorm(1, mu_tot, sqrt(var_tot))
-    return(p_approx)
-
-}
-
-
 prob_tripR_full <- function(lambda,k,ell,d,m,n,q){
     # pre compute pin and pout
     f_in <- sapply(0:k, prob_seq_edits_in_grp, d, d+ell, lambda, k, q)
@@ -134,7 +63,6 @@ prob_tripR_full <- function(lambda,k,ell,d,m,n,q){
     #in >= 1
     psum_in <- sapply(1:(mm), prob_allcomb, f_in,  k, m)
     psum_out <- sapply(0:(mm), prob_allcomb, f_out, k, m)
-    #psum_out_greater_than <- sapply(0:(mm), function(i) sum(psum_out[(i+1):(mm+1)]))
     psum_out_strict_less <- sapply(1:mm, function(i) sum(psum_out[1:i]))
 
     # put together
@@ -270,20 +198,6 @@ colouring <- function(x,l, lambda,sample_p,chars){
     }
     return(paste(p1, collapse=""))
 }
-
-
-#colouring <- function(x,l,lambda,sample_p, chars){
-#	p1 <- stringr::str_split(x, "")[[1]]
-#	M <- length(p1)
-#	n_edits <- rpois(1, lambda*l) # num edits
-#	i <- 1
-#	while (i <= n_edits && p1[M] == "0"){
-#		pos <- min(which(p1 == "0"))
-#		p1[pos] <- sample(chars, size=1, prob=sample_p)
-#		i <- i+1
-#	}
-#	return(paste(p1, collapse="")) 
-#}
 
 
 simulate_barcodes <- function(tree, k, lambda_vec, m, chars){
