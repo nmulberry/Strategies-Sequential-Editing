@@ -53,6 +53,17 @@ p1_max_d <- function(k,ell,lambda, m, n, q,eps){
 	}
 }
 
+prob_trip_approx <- function(lambda, k, ell,d,m,q){
+    mu_in <- m*expected_in_grp(d,d+ell,lambda,k,q)
+    mu_out<- m*expected_out_grp(d,lambda,k,q)
+    var_in <- m*var_in_grp(d,d+ell,lambda,k,q)
+    var_out <- m*var_out_grp(d,lambda,k,q)
+    ## normal approx
+    mu_tot <- mu_in-mu_out
+    var_tot <- var_in+var_out
+    p_approx <- pnorm(1, mu_tot, sqrt(var_tot))
+    return(p_approx)
+}
 
 prob_tripR_full <- function(lambda,k,ell,d,m,n,q){
     # pre compute pin and pout
@@ -223,12 +234,8 @@ get_RF_score <- function(i,tree,true_dists,k,lambda,m,chars){
 	rownames(dists) <- colnames(dists) <- tree$tip.label
 	upgma_tree <- upgma(dists)	
 	# get RF dist
-	#dist <- TreeDistance(tree, upgma_tree)
 	dist <- dist.topo(tree, upgma_tree, method="PH85")
-	# observed triplets
-    trips <- proportion_triplets(true_dists, dists)
-	#print(paste("rate:", lambda, "i:", i, "done"))
-	return(data.frame(k=k,i=i, m=m, triplets=trips, sim_dist=dist))
+	return(data.frame(k=k,i=i, m=m, sim_dist=dist))
 }
 
 

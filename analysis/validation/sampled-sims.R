@@ -20,7 +20,6 @@ read_samp_results <- function(file, dir){
 
 
 
-
 if (load_res){
     files <- list.files("output/test_samp")
 
@@ -33,7 +32,6 @@ if (load_res){
 
 
 
-#res <- filter(res0, m < 70)
 
 res <- res0
 res$lambda <- res$lambda1
@@ -44,9 +42,6 @@ res$lambda <- res$lambda1
 res <- res %>% group_by(n_gen) %>% mutate(ell=1/(n_gen+1), n= max(n)) %>% ungroup() %>%  
     mutate(d = 1-ell, q=(1/j))  
 
-
-
-#res <- readRDS("uniform_simulations.RDS")
 
 # count prop trips exact
 res_trunc <- res %>%

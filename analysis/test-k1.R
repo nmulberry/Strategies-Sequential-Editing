@@ -21,8 +21,6 @@ read_unif_results <- function(file, dir){
 }
 
 
-
-
 if (load_res){
     files <- list.files("output/test_k1")
     if (length(files) > 0){
@@ -91,9 +89,6 @@ gg_test <- ggplot(res2, aes(x=lambda, y=value, col=name, linetype=name))+
 	theme(legend.position="bottom")
 
 ggsave("k1-results.pdf",height=8, width=10)
-
-
-
 
 
 
