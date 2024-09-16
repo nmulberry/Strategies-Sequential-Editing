@@ -1,8 +1,6 @@
 source("setup.R")
 
 
-if (FALSE) {
-
 
 nsim <- 500
 chars <- all_chars
@@ -75,7 +73,7 @@ ggplot(filter(res22, ell==0.1, k==5), aes(lambda, y=value, group=name, col=name,
     labs(y="Probability resolve (a,b|c)",col="", linetype="", x=expression(lambda))
 
 ggsave("onetrip-sim-small.pdf")
-}
+
 
 
 #### trees
