@@ -100,6 +100,10 @@ prob_allcomb <- function(x,f,k,m){
     return(sum(prod_f*f_a))
 }
 
+prob_zero <- function(lambda, k, ell, d, m, q){
+    p0 <- prob_seq_edits_in_grp(0,d, d+ell, lambda, k, q)
+    return(p0^m)
+}
 
 opt_p0_fix_d <- function(k,ell,eps,n, d2){
     res <- optimize(prob_zero, c(1,1/ell), tol=0.00001, k=k, ell=ell, d=d2,m=1,q=0)
@@ -298,72 +302,19 @@ generate_test_tree <- function(alpha, beta, n){
     tree$root.edge <- tree$root.edge/dd     
     return(tree)
 }
+
 generate_tree <- function(alpha, beta, n, ell){
-        tree <- generate_test_tree(alpha,beta,n)
+	tree <- generate_test_tree(alpha,beta,n)
+    ell2 <- get_min_branch(tree)
+    it <- 1
+    while (ell2 < ell && it < 10){
+        tree <- generate_test_tree(alpha, beta, n)
         ell2 <- get_min_branch(tree)
-        it <- 1
-        while (ell2 < ell && it < 10){
-                tree <- generate_test_tree(alpha, beta, n)
-                ell2 <- get_min_branch(tree)
-                it <- it +1
-        }
-        return(tree)
+        it <- it +1
+    }
+    return(tree)
 }
 
-
-read_results <- function(file,dir){
-	df <- readRDS(paste0(dir, "/", file))
-	name <- strsplit(file, split="_")
-	model <- name[[1]][1]
-	m <- name[[1]][2]
-	j <- name[[1]][3]
-	k <- name[[1]][4]
-	k <- strsplit(k, split="\\.")[[1]][1]
-	df$model <- model
-	df$m <- as.numeric(m)
-	df$j <- as.numeric(j)
-	df$k <- as.numeric(k)
-	return(df)
-}
-
-get_character_matrix <- function(){
-	# get tree
-	tree <- generate_tree(1, 200, n)
-	# run simulation
-	res <- simulate_barcodes(tree, k, lambda, m, chars)
-	# process results:
-	# first get priors on insertion freqs
-	freqs <- lapply(res, get_insert_freqs)	
-	freqs <- do.call(rbind, freqs)
-	prior <- data.frame(chars=1:length(chars))
-	prior$freqs <- rowMeans(freqs)	
-	# next, remove nonsequentially identical edits
-	clean_res <- lapply(res, remove_homo_edits)
-	# now create character matrix & combine bars
-	# n_ij = mutation in ith cell at position j
-	# each char becomes an integer, 0 becomes -1 ("misssing")
-	tot_res <- do.call(paste0, clean_res)
-	tot_res_list <- strsplit(tot_res, "")
-	M <- unlist(tot_res_list)
-	# map each character to an integer	
-	M2 <- match(M, chars)
-	M2[M=="*"] <- -1
-	M2[M=="0"] <- 0
-	M2 <- matrix(M2, ncol=m*k, byrow=TRUE)		
-	rownames(M2) <- paste0("c", seq(1:2^n))
-	colnames(M2) <- paste0("p", seq(1:(m*k)))
-
-}
-
-get_insert_freqs <- function(bar){
-	char <- unlist(strsplit(bar, ''))
-	char <- char[char != "0"]
-	# count
-	counts <- table(char)
-	counts <- counts/sum(counts)
-	counts <- data.frame(counts)
-	return(counts$Freq)	
-}
 
 prune_tree <- function(tree, rho){
 	ntips <- length(tree$tip.label)

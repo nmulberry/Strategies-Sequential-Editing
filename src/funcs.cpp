@@ -107,31 +107,40 @@ NumericVector triplet_score(NumericMatrix D_true, NumericMatrix D) {
   return NumericVector::create(double(true_count), depth); 
 }
 
+
 //[[Rcpp::export]]
-// Remove nonsequential identical edits
-// Return updated barcodes
-CharacterVector remove_homo_edits(
+// Count nonsequential identical edits
+// for each tape, get lik of data under q
+//looking only at sites which we know are not sequential for sure
+NumericVector mean_homo(
 	CharacterVector bars){
-	CharacterVector newbars = clone(bars); //copy	
-	int m = bars.size(); // num samples
+    int n = bars.size(); // num samples
 	int k = bars[0].size(); // length bar
-	for (int i = 0; i < m; ++i) {
-		for (int j = i+1; j < m; ++j) {
+	double tot=0.0;
+	double hom=0.0;
+	NumericVector res(2);
+	for (int i = 0; i < n; ++i) {//compare pair-wise
+		for (int j = i+1; j < n; ++j) {
 			std::string b1 = Rcpp::as<std::string>(bars[i]);
 		    std::string b2 = Rcpp::as<std::string>(bars[j]);
 			int s = count_sequential_matches(b1,b2);
-	     // change additional matching characters
-      	for (int p = s; p < k; ++p) {
-        	if (b1[p] == b2[p]) {
-          		b1[p] = b2[p] = '*';
-        	}
-      	}
-      newbars[i] = b1;
-      newbars[j] = b2;
-    }
-  }
-  return newbars;
+			if (s+1 < k){//don't count first nonseq char	
+      			for (int p = s+1; p < k; ++p) {
+					if (b1[p] != '0' && b2[p] != '0'){
+						tot += 1;
+						if (b1[p] == b2[p]){
+							hom +=1;
+						}
+					}
+				}
+			} 
+    	}
+	}
+	res[0] = hom;
+	res[1] = tot;
+    return res;
 }
+
 
 
 // [[Rcpp::export]]
