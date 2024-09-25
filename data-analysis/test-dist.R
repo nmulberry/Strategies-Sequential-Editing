@@ -17,13 +17,14 @@ res <- simulate_barcodes(tree, k, lambda_vec, m, chars)
 # Build distance matrix from all barcodes
 dists <- get_distance_sequential(res)
 dists <- max(dists)-dists	
-diag(dists) <- Inf
-alpha <- min(dists)
 
 #---- compare trees (true accuracy)
 rownames(dists) <- colnames(dists) <- tree$tip.label
 upgma_tree <- upgma(dists)	
 # get RF dist
 RF_dist <- dist.topo(tree, upgma_tree, method="PH85")
+
+#-----
+
 
 
