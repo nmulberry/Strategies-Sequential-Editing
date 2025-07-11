@@ -3,33 +3,42 @@ lambda <- seq(1, 30, by=1)
 
 
 ## test when q=0:
-k <- c(1,5,13)
-m <- c(10,100)
+k <- c(5,9, 13)
+m <- c(1,5, 10,100)
 q <- 0.0
-ell <- c(0.1,0.005)
+ell <- c(0.1)
 n <- c(3,100,1000) 
 
 df <- crossing(lambda=lambda, k=k, ell=ell, m=m,n=n,q=q)
 df$dmax <- 1-df$ell
 
 res <- df
-res$B1 <- df %>% pmap_dbl(pfull_1)
-res$B0 <- df %>% pmap_dbl(., ~pfull_0(..1,..2,..3,..4,..5,..6,..7))
+res$Bq <- df %>% pmap_dbl(pfull_1)
+res$Binf <- df %>% pmap_dbl(., ~pfull_0(..1,..2,..3,..4,..5,..6,..7))
 
 
 
-res2 <- res %>% pivot_longer(cols=c("B1", "B0"))
+res2 <- res %>% pivot_longer(cols=c("Bq", "Binf"))
 
 res2$k <- factor(res2$k)
 
 test3 <- ggplot(filter(res2), 
     aes(x=lambda, y=value, col=name, linetype=name))+
-    geom_line(linewidth=1.1)+ facet_grid(m+ell~n+k, labeller=label_both)+
+    geom_line(linewidth=0.8)+ facet_nested(m~n+k, labeller=label_both)+
     labs(x=expression(lambda), y="", col="", linetype="")+
-    scale_linetype_manual(values=c("B0"="solid", "B1"="twodash"))+
-    scale_colour_manual(values=c("B1"="red", "B0"="lightblue"))+
-	theme(legend.position="bottom")
-ggsave("test-approx-q0.png", width=10, height=9)
+    scale_linetype_manual(values=c("Binf"="solid", "Bq"="twodash"))+
+    scale_colour_manual(values=c("Bq"="red", "Binf"="lightblue"))+
+	theme(legend.position="bottom",
+        strip.background=element_rect())+
+    scale_y_continuous(breaks=c(0.5, 1))
+
+ggsave("test-approx-q0.pdf", width=10, height=9)
+
+
+browser()
+
+
+
 
 ########################
 # TEST 2: TRIPLET PROB
@@ -38,11 +47,11 @@ nsim <- 100
 chars <- all_chars
 k <- c(5,13)
 lambda <- seq(1,30, by=1)
-m <- c(10,30)
+m <- c(1, 10,30)
 i <- 1:nsim
-j <- c(4,16,64)
+j <- c(4,8,16)
 d <- 0.8
-ell <- c(0.1, 0.01)
+ell <- c(0.01)
 pars0 <- crossing(i=i, lambda=lambda,j=j, m=m,k=k,d=d, ell=ell)
 ##===========================#
 ## test diff
@@ -85,16 +94,22 @@ mutate(p0 = pmap_dbl(., ~ ptrip_0(..5,..1,..4,..6,..3,3,..8)),
 
 res22 <- res22 %>%
     pivot_longer(cols=starts_with("p"))%>%
-    mutate(name=case_when(name=="ptrip"~"Simulated", name=="p0"~"B0", name=="p1"~"B1",
+    mutate(name=case_when(name=="ptrip"~"Simulated", name=="p0"~"Binf", name=="p1"~"Bq",
 	name=="p2"~"p_approx_split"))
     
-res22$name <- factor(res22$name, levels=c("Simulated", "B1", "B0"))
-ggplot(filter(res22), aes(lambda, y=value, group=name, col=name, linetype=name))+
+res22$name <- factor(res22$name, levels=c("Simulated", "Bq", "Binf"))
+
+
+
+gg_trip <- ggplot(filter(res22), aes(lambda, y=value, group=name, col=name, linetype=name))+
     geom_line()+
-    scale_linetype_manual(values=c(Simulated="solid", "B0"="dashed","B1" = "dashed"))+
-	scale_colour_manual(values=c(Simulated="black", "B1"="red", "B0" = "lightblue"))+
-    facet_grid(m+j~k+ell, labeller=label_both)+theme(legend.position="bottom")+
-    labs(y="Prob not resolve triplet",col="", linetype="", x=expression(lambda))
+    scale_linetype_manual(values=c(Simulated="solid", "Binf"="dashed","Bq" = "dashed"))+
+	scale_colour_manual(values=c(Simulated="black", "Bq"="red", "Binf" = "lightblue"))+
+    facet_nested(m~k+j, labeller=label_both)+theme(legend.position="bottom")+
+    labs(y="Prob not resolve triplet",col="", linetype="", x=expression(lambda))+
+	theme(legend.position="bottom",
+        strip.background=element_rect())+
+    scale_y_continuous(breaks=c(0.5, 1))
 
 ggsave("onetrip-sim-all.png", width=10, height=9)
 

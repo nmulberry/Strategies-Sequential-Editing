@@ -215,31 +215,56 @@ colouring <- function(x,l, lambda,sample_p,chars){
 }
 
 
-simulate_barcodes <- function(tree, k, lambda_vec, m, chars){
+simulate_barcodes <- function(tree, k, lambda_vec, m, chars, edit_dist){
 	# sim bars over tree
 	root <- paste0(rep("0",k), collapse='')
-    sample_p <- rep(1/length(chars), length(chars))
-	res <- lapply(lambda_vec, simulate_barcode, chars, sample_p,tree,root)
+#    sample_p <- rep(1/length(chars), length(chars))
+	res <- lapply(lambda_vec, simulate_barcode, chars, edit_dist,tree,root)
 	return(res)
 }
 
 # returns dataframe with simulated trip score and upgma dist
-get_RF_score <- function(i,tree,true_dists,k,lambda,m,chars){
+get_RF_score <- function(i,k, lambda, m, tree,true_dists, chars, edit_dist=NA, method="UPGMA"){
 	# simulate
 	if (length(lambda)==m){
 		lambda_vec <- lambda
 	} else {
 		lambda_vec <- rep(lambda, m)
 	}
-	res <- simulate_barcodes(tree, k, lambda_vec, m, chars)
+	# editing distribution
+	if (all(is.na(edit_dist))){#if not specified, take uniform
+		edit_dist <- rep(1/length(chars), length(chars))
+	}
+	#---------#
+	res <- simulate_barcodes(tree, k, lambda_vec, m, chars, edit_dist)
 	# Build distance matrix from all barcodes
 	dists <- get_distance_sequential(res)
 	dists <- max(dists)-dists	
 	rownames(dists) <- colnames(dists) <- tree$tip.label
-	upgma_tree <- upgma(dists)	
-	# get RF dist
-	dist <- dist.topo(tree, upgma_tree, method="PH85")
-	return(data.frame(k=k,i=i, m=m, sim_dist=dist))
+	if (method=="UPGMA"){
+		rec_tree <- upgma(dists)	
+		dist <- TreeDist::TreeDistance(rec_tree, tree)
+		return(data.frame(k=k,i=i, m=m, sim_dist=dist))
+	} else if (method=="NJ"){
+		rec_tree <- nj(as.dist(dists))
+		dist <- TreeDist::TreeDistance(rec_tree, tree)
+		
+		return(data.frame(k=k,i=i, m=m, sim_dist=dist))
+	} else if (method=="TRIP"){
+		# score trips from dist matrix directly
+		dist <- triplet_score(true_dists, dists)	
+		return(data.frame(k=k,i=i, m=m, sim_dist=dist))
+	} else if (method=="ALL"){
+		rec_tree <- upgma(dists)	
+		upgma_dist <- TreeDist::TreeDistance(rec_tree, tree)
+
+		rec_tree <- nj(as.dist(dists))
+		nj_dist <- TreeDist::TreeDistance(rec_tree, tree)
+
+		trip_dist <- triplet_score(true_dists, dists)	
+		return(data.frame(k=k,i=i, m=m, upgma=upgma_dist,
+			nj=nj_dist, triplets=trip_dist))
+	}
 }
 
 
@@ -274,9 +299,11 @@ generate_twostage_tree <- function(alpha, beta, n1, n, ratio){
 
 
 # Simulate process and return df with different scores
-simulate_and_score <- function(nsim, k, lambda, m,ell,j, tree, true_dists){
-	chars <- all_chars[1:j]
-	df <- 1:nsim %>% map_dfr(get_RF_score, tree, true_dists, k, lambda, m, chars)
+simulate_and_score <- function(nsim, k, lambda, m,ell,j, tree, true_dists, chars, edit_dist=NA, method="UPGMA"){
+	message(paste("Running for lambda:", lambda, "k:", k, "m:", m))
+	df <- 1:nsim %>% map_dfr(get_RF_score, k=k, lambda=lambda, m=m, 
+		tree=tree, true_dists=true_dists, chars=chars,edit_dist=edit_dist, method=method)
+
 	df$j <- j
 	df$ell <- ell
 	df$lambda1 <- unique(lambda)[1]
